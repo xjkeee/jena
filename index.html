@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Учет посещений клиентов</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+    .container { display: flex; flex-direction: column; gap: 20px; }
+    .card { border: 1px solid #ddd; padding: 15px; border-radius: 5px; }
+    input, textarea, button { width: 100%; padding: 8px; margin: 5px 0; }
+    button { background-color: #4285F4; color: white; border: none; cursor: pointer; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Учет посещений клиентов</h1>
+    
+    <div class="card">
+      <h2>Добавить посещение</h2>
+      <input type="text" id="phoneInput" placeholder="Номер телефона (79161234567)" pattern="[0-9]{11}">
+      <textarea id="noteInput" placeholder="Заметка (необязательно)"></textarea>
+      <button id="addBtn">Добавить посещение</button>
+    </div>
+    
+    <div class="card">
+      <h2>Поиск посещений</h2>
+      <input type="text" id="searchInput" placeholder="Введите номер телефона">
+      <button id="searchBtn">Найти</button>
+      <div id="results"></div>
+    </div>
+    
+    <div class="card">
+      <h2>Все клиенты</h2>
+      <table id="customersTable">
+        <thead>
+          <tr>
+            <th>Телефон</th>
+            <th>Посещений</th>
+            <th>Последнее посещение</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Добавляем Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.0.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.0.2/firebase-firestore-compat.js"></script>
+  
+  <script>
+    // Ваша конфигурация Firebase (замените на свою)
+    const firebaseConfig = {
+    apiKey: "AIzaSyDBgnqtmJnGFCjiHenIE4VngMFKWHHwCnE",
+    authDomain: "jena-c2a02.firebaseapp.com",
+    projectId: "jena-c2a02",
+    storageBucket: "jena-c2a02.firebasestorage.app",
+    messagingSenderId: "393318408268",
+    appId: "1:393318408268:web:68bcf822f6bcb45653d4e9",
+    measurementId: "G-M1GHXY8WVF"
+    };
+
+    // Инициализация Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // Элементы DOM
+    const phoneInput = document.getElementById('phoneInput');
+    const noteInput = document.getElementById('noteInput');
+    const addBtn = document.getElementById('addBtn');
+    const searchInput = document.getElementById('searchInput');
+    const searchBtn = document.getElementById('searchBtn');
+    const resultsDiv = document.getElementById('results');
+    const customersTable = document.getElementById('customersTable').getElementsByTagName('tbody')[0];
+
+    // Добавление посещения
+    addBtn.addEventListener('click', async () => {
+      const phone = phoneInput.value.trim();
+      const note = noteInput.value.trim();
+      
+      if (!phone || phone.length !== 11) {
+        alert('Введите корректный номер телефона (11 цифр)');
+        return;
+      }
+
+      try {
+        // Проверяем, есть ли уже такой клиент
+        const customerRef = db.collection('customers').doc(phone);
+        const doc = await customerRef.get();
+        
+        const visitData = {
+          date: new Date().toISOString(),
+          note: note || 'Нет заметки'
+        };
+        
+        if (doc.exists) {
+          // Обновляем существующего клиента
+          await customerRef.update({
+            visits: firebase.firestore.FieldValue.arrayUnion(visitData),
+            lastVisit: visitData.date,
+            visitCount: firebase.firestore.FieldValue.increment(1)
+          });
+        } else {
+          // Создаем нового клиента
+          await customerRef.set({
+            phone: phone,
+            visits: [visitData],
+            lastVisit: visitData.date,
+            visitCount: 1,
+            createdAt: new Date().toISOString()
+          });
+        }
+        
+        phoneInput.value = '';
+        noteInput.value = '';
+        alert('Посещение добавлено!');
+        loadAllCustomers();
+      } catch (error) {
+        console.error('Ошибка:', error);
+        alert('Произошла ошибка: ' + error.message);
+      }
+    });
+
+    // Поиск посещений
+    searchBtn.addEventListener('click', async () => {
+      const phone = searchInput.value.trim();
+      
+      if (!phone) {
+        alert('Введите номер телефона');
+        return;
+      }
+      
+      try {
+        const doc = await db.collection('customers').doc(phone).get();
+        
+        if (doc.exists) {
+          const data = doc.data();
+          let html = `<h3>Клиент: ${phone}</h3>`;
+          html += `<p>Всего посещений: ${data.visitCount}</p>`;
+          html += `<p>Последнее посещение: ${new Date(data.lastVisit).toLocaleString()}</p>`;
+          html += '<h4>История посещений:</h4><ul>';
+          
+          data.visits.forEach(visit => {
+            html += `<li>${new Date(visit.date).toLocaleString()} - ${visit.note}</li>`;
+          });
+          
+          html += '</ul>';
+          resultsDiv.innerHTML = html;
+        } else {
+          resultsDiv.innerHTML = '<p>Клиент не найден</p>';
+        }
+      } catch (error) {
+        console.error('Ошибка:', error);
+        resultsDiv.innerHTML = '<p>Произошла ошибка при поиске</p>';
+      }
+    });
+
+    // Загрузка всех клиентов
+    async function loadAllCustomers() {
+      try {
+        const snapshot = await db.collection('customers').orderBy('visitCount', 'desc').get();
+        customersTable.innerHTML = '';
+        
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          const row = customersTable.insertRow();
+          row.insertCell().textContent = data.phone;
+          row.insertCell().textContent = data.visitCount;
+          row.insertCell().textContent = new Date(data.lastVisit).toLocaleString();
+        });
+      } catch (error) {
+        console.error('Ошибка:', error);
+      }
+    }
+
+    // Загружаем данные при старте
+    loadAllCustomers();
+  </script>
+</body>
+</html>
