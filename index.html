@@ -12,38 +12,106 @@
     button { background-color: #4285F4; color: white; border: none; cursor: pointer; }
     table { width: 100%; border-collapse: collapse; }
     th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+    .tab { padding: 10px; cursor: pointer; border: 1px solid #ddd; border-radius: 5px; }
+    .tab.active { background-color: #4285F4; color: white; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+    .modal-content { background-color: white; margin: 10% auto; padding: 20px; width: 80%; max-width: 600px; border-radius: 5px; }
+    .close { float: right; cursor: pointer; font-size: 20px; }
+    .modal-content h3 { margin-top: 0; }
+    .modal-content ul { padding-left: 20px; }
+    .modal-content li { margin-bottom: 5px; }
+    .modal-content p { margin: 5px 0; }
+    .modal-content h4 { margin-top: 15px; }
+    .modal-content table { margin-top: 10px; }
+    .modal-content th, .modal-content td { padding: 8px; }
+    .modal-content th { background-color: #f2f2f2; }
+    .modal-content tr:nth-child(even) { background-color: #f9f9f9; }
+    .product-row { display: flex; gap: 10px; margin-bottom: 10px; }
+    .product-row select, .product-row input { flex: 1; }
+    .product-row button { width: auto; }
+    .product-row select { max-width: 200px; }
+    .product-row input { max-width: 100px; }
+    .product-row select option { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>Учет посещений клиентов</h1>
     
-    <div class="card">
-      <h2>Добавить посещение</h2>
-      <input type="text" id="phoneInput" placeholder="Номер телефона (79161234567)" pattern="[0-9]{11}">
-      <textarea id="noteInput" placeholder="Заметка (необязательно)"></textarea>
-      <button id="addBtn">Добавить посещение</button>
+    <div class="tabs">
+      <div class="tab active" data-tab="visits">Посещения</div>
+      <div class="tab" data-tab="products">Товары</div>
     </div>
     
-    <div class="card">
-      <h2>Поиск посещений</h2>
-      <input type="text" id="searchInput" placeholder="Введите номер телефона">
-      <button id="searchBtn">Найти</button>
-      <div id="results"></div>
+    <div class="tab-content active" id="visits">
+      <div class="card">
+        <h2>Добавить посещение</h2>
+        <input type="text" id="nameInput" placeholder="Имя клиента">
+        <input type="text" id="phoneInput" placeholder="Номер телефона (79161234567)" pattern="[0-9]{11}">
+        <div id="productsContainer">
+          <div class="product-row">
+            <select class="productSelect">
+              <option value="">Выберите товар</option>
+            </select>
+            <input type="number" class="quantityInput" placeholder="Количество" min="1" value="1">
+            <button class="removeProductBtn" style="display: none;">Удалить</button>
+          </div>
+        </div>
+        <button id="addProductRowBtn">Добавить товар</button>
+        <textarea id="noteInput" placeholder="Заметка (необязательно)"></textarea>
+        <button id="addBtn">Добавить посещение</button>
+      </div>
+      
+      <div class="card">
+        <h2>Поиск посещений</h2>
+        <input type="text" id="searchInput" placeholder="Введите номер телефона">
+        <button id="searchBtn">Найти</button>
+        <div id="results"></div>
+      </div>
+      
+      <div class="card">
+        <h2>Все клиенты</h2>
+        <table id="customersTable">
+          <thead>
+            <tr>
+              <th>Телефон</th>
+              <th>Имя</th>
+              <th>Посещений</th>
+              <th>Последнее посещение</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
     
-    <div class="card">
-      <h2>Все клиенты</h2>
-      <table id="customersTable">
-        <thead>
-          <tr>
-            <th>Телефон</th>
-            <th>Посещений</th>
-            <th>Последнее посещение</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+    <div class="tab-content" id="products">
+      <div class="card">
+        <h2>Справочник товаров</h2>
+        <input type="text" id="newProductInput" placeholder="Название товара">
+        <select id="categorySelect">
+          <option value="">Выберите категорию</option>
+        </select>
+        <button id="addProductBtn">Добавить товар</button>
+        <ul id="productsList"></ul>
+      </div>
+      <div class="card">
+        <h2>Управление категориями</h2>
+        <input type="text" id="newCategoryInput" placeholder="Название категории">
+        <button id="addCategoryBtn">Добавить категорию</button>
+        <ul id="categoriesList"></ul>
+      </div>
+    </div>
+  </div>
+
+  <div id="customerModal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <h2>История клиента</h2>
+      <div id="customerHistory"></div>
     </div>
   </div>
 
@@ -68,24 +136,202 @@
     const db = firebase.firestore();
 
     // Элементы DOM
+    const nameInput = document.getElementById('nameInput');
     const phoneInput = document.getElementById('phoneInput');
     const noteInput = document.getElementById('noteInput');
+    const productsContainer = document.getElementById('productsContainer');
+    const addProductRowBtn = document.getElementById('addProductRowBtn');
+    const newProductInput = document.getElementById('newProductInput');
+    const categorySelect = document.getElementById('categorySelect');
+    const addProductBtn = document.getElementById('addProductBtn');
+    const productsList = document.getElementById('productsList');
     const addBtn = document.getElementById('addBtn');
     const searchInput = document.getElementById('searchInput');
     const searchBtn = document.getElementById('searchBtn');
     const resultsDiv = document.getElementById('results');
     const customersTable = document.getElementById('customersTable').getElementsByTagName('tbody')[0];
+    const tabs = document.querySelectorAll('.tab');
+    const tabContents = document.querySelectorAll('.tab-content');
+    const modal = document.getElementById('customerModal');
+    const customerHistory = document.getElementById('customerHistory');
+    const closeModal = document.querySelector('.close');
+    const newCategoryInput = document.getElementById('newCategoryInput');
+    const addCategoryBtn = document.getElementById('addCategoryBtn');
+    const categoriesList = document.getElementById('categoriesList');
+
+    // Переключение табов
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        tabs.forEach(t => t.classList.remove('active'));
+        tabContents.forEach(content => content.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(tab.dataset.tab).classList.add('active');
+      });
+    });
+
+    // Добавление строки товара
+    addProductRowBtn.addEventListener('click', () => {
+      const productRow = document.createElement('div');
+      productRow.className = 'product-row';
+      productRow.innerHTML = `
+        <select class="productSelect">
+          <option value="">Выберите товар</option>
+        </select>
+        <input type="number" class="quantityInput" placeholder="Количество" min="1" value="1">
+        <button class="removeProductBtn">Удалить</button>
+      `;
+      productsContainer.appendChild(productRow);
+      loadProductsIntoSelect(productRow.querySelector('.productSelect'));
+      productRow.querySelector('.removeProductBtn').addEventListener('click', () => {
+        productRow.remove();
+      });
+    });
+
+    // Загрузка товаров в выпадающий список
+    async function loadProductsIntoSelect(select) {
+      try {
+        const snapshot = await db.collection('products').get();
+        select.innerHTML = '<option value="">Выберите товар</option>';
+        const categories = {};
+        snapshot.forEach(doc => {
+          const product = doc.data();
+          if (!categories[product.category]) {
+            categories[product.category] = [];
+          }
+          categories[product.category].push({ id: doc.id, name: product.name });
+        });
+        Object.keys(categories).sort().forEach(category => {
+          const optgroup = document.createElement('optgroup');
+          optgroup.label = category;
+          categories[category].forEach(product => {
+            const option = document.createElement('option');
+            option.value = product.id;
+            option.textContent = product.name;
+            optgroup.appendChild(option);
+          });
+          select.appendChild(optgroup);
+        });
+      } catch (error) {
+        console.error('Ошибка:', error);
+      }
+    }
+
+    // Загрузка товаров
+    async function loadProducts() {
+      try {
+        const snapshot = await db.collection('products').get();
+        const selects = productsContainer.querySelectorAll('.productSelect');
+        selects.forEach(select => {
+          select.innerHTML = '<option value="">Выберите товар</option>';
+          const categories = {};
+          snapshot.forEach(doc => {
+            const product = doc.data();
+            if (!categories[product.category]) {
+              categories[product.category] = [];
+            }
+            categories[product.category].push({ id: doc.id, name: product.name });
+          });
+          Object.keys(categories).sort().forEach(category => {
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = category;
+            categories[category].forEach(product => {
+              const option = document.createElement('option');
+              option.value = product.id;
+              option.textContent = product.name;
+              optgroup.appendChild(option);
+            });
+            select.appendChild(optgroup);
+          });
+        });
+        productsList.innerHTML = '';
+        const categories = {};
+        snapshot.forEach(doc => {
+          const product = doc.data();
+          if (!categories[product.category]) {
+            categories[product.category] = [];
+          }
+          categories[product.category].push({ id: doc.id, name: product.name });
+        });
+        Object.keys(categories).sort().forEach(category => {
+          const li = document.createElement('li');
+          li.textContent = category;
+          const ul = document.createElement('ul');
+          categories[category].forEach(product => {
+            const li = document.createElement('li');
+            li.textContent = product.name;
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = 'Удалить';
+            deleteBtn.onclick = () => deleteProduct(product.id);
+            li.appendChild(deleteBtn);
+            ul.appendChild(li);
+          });
+          li.appendChild(ul);
+          productsList.appendChild(li);
+        });
+      } catch (error) {
+        console.error('Ошибка:', error);
+      }
+    }
+
+    // Добавление товара
+    addProductBtn.addEventListener('click', async () => {
+      const name = newProductInput.value.trim();
+      const category = categorySelect.value;
+      if (!name) {
+        alert('Введите название товара');
+        return;
+      }
+      if (!category) {
+        alert('Выберите категорию');
+        return;
+      }
+      try {
+        const categoryDoc = await db.collection('categories').doc(category).get();
+        const categoryName = categoryDoc.data().name;
+        await db.collection('products').add({ name, category: categoryName });
+        newProductInput.value = '';
+        categorySelect.value = '';
+        loadProducts();
+      } catch (error) {
+        console.error('Ошибка:', error);
+        alert('Произошла ошибка: ' + error.message);
+      }
+    });
+
+    // Удаление товара
+    async function deleteProduct(id) {
+      try {
+        await db.collection('products').doc(id).delete();
+        loadProducts();
+      } catch (error) {
+        console.error('Ошибка:', error);
+        alert('Произошла ошибка: ' + error.message);
+      }
+    }
 
     // Добавление посещения
     addBtn.addEventListener('click', async () => {
       const phone = phoneInput.value.trim();
+      const name = nameInput.value.trim();
       const note = noteInput.value.trim();
+      const productRows = productsContainer.querySelectorAll('.product-row');
+      const products = [];
+      productRows.forEach(row => {
+        const product = row.querySelector('.productSelect').value;
+        const quantity = parseInt(row.querySelector('.quantityInput').value) || 1;
+        if (product) {
+          products.push({ product, quantity });
+        }
+      });
       
       if (!phone || phone.length !== 11) {
         alert('Введите корректный номер телефона (11 цифр)');
         return;
       }
-
+      if (!name) {
+        alert('Введите имя клиента');
+        return;
+      }
       try {
         // Проверяем, есть ли уже такой клиент
         const customerRef = db.collection('customers').doc(phone);
@@ -93,11 +339,12 @@
         
         const visitData = {
           date: new Date().toISOString(),
-          note: note || 'Нет заметки'
+          note: note || 'Нет заметки',
+          products: products
         };
         
         if (doc.exists) {
-          // Обновляем существующего клиента
+          // Обновляем существующего клиента (имя не обновляем)
           await customerRef.update({
             visits: firebase.firestore.FieldValue.arrayUnion(visitData),
             lastVisit: visitData.date,
@@ -107,15 +354,26 @@
           // Создаем нового клиента
           await customerRef.set({
             phone: phone,
+            name: name,
             visits: [visitData],
             lastVisit: visitData.date,
             visitCount: 1,
             createdAt: new Date().toISOString()
           });
         }
-        
         phoneInput.value = '';
+        nameInput.value = '';
         noteInput.value = '';
+        productsContainer.innerHTML = `
+          <div class="product-row">
+            <select class="productSelect">
+              <option value="">Выберите товар</option>
+            </select>
+            <input type="number" class="quantityInput" placeholder="Количество" min="1" value="1">
+            <button class="removeProductBtn" style="display: none;">Удалить</button>
+          </div>
+        `;
+        loadProducts();
         alert('Посещение добавлено!');
         loadAllCustomers();
       } catch (error) {
@@ -138,7 +396,8 @@
         
         if (doc.exists) {
           const data = doc.data();
-          let html = `<h3>Клиент: ${phone}</h3>`;
+          let html = `<h3>Клиент: ${data.name || phone}</h3>`;
+          html += `<p>Телефон: ${data.phone}</p>`;
           html += `<p>Всего посещений: ${data.visitCount}</p>`;
           html += `<p>Последнее посещение: ${new Date(data.lastVisit).toLocaleString()}</p>`;
           html += '<h4>История посещений:</h4><ul>';
@@ -168,8 +427,11 @@
           const data = doc.data();
           const row = customersTable.insertRow();
           row.insertCell().textContent = data.phone;
+          row.insertCell().textContent = data.name || '';
           row.insertCell().textContent = data.visitCount;
           row.insertCell().textContent = new Date(data.lastVisit).toLocaleString();
+          row.style.cursor = 'pointer';
+          row.onclick = () => showCustomerHistory(doc.id, data);
         });
       } catch (error) {
         console.error('Ошибка:', error);
@@ -178,6 +440,95 @@
 
     // Загружаем данные при старте
     loadAllCustomers();
+
+    // Показ истории клиента
+    async function showCustomerHistory(id, data) {
+      customerHistory.innerHTML = `<h3>Клиент: ${data.name || data.phone}</h3>`;
+      customerHistory.innerHTML += `<p>Телефон: ${data.phone}</p>`;
+      customerHistory.innerHTML += `<p>Всего посещений: ${data.visitCount}</p>`;
+      customerHistory.innerHTML += `<p>Последнее посещение: ${new Date(data.lastVisit).toLocaleString()}</p>`;
+      customerHistory.innerHTML += '<h4>История посещений:</h4><ul>';
+      data.visits.forEach(visit => {
+        let productsHtml = '';
+        if (visit.products && visit.products.length > 0) {
+          productsHtml = visit.products.map(p => `Товар: ${p.product} (Количество: ${p.quantity})`).join(', ');
+        } else {
+          productsHtml = 'Товары не указаны';
+        }
+        customerHistory.innerHTML += `<li>${new Date(visit.date).toLocaleString()} - ${productsHtml} - ${visit.note}</li>`;
+      });
+      customerHistory.innerHTML += '</ul>';
+      modal.style.display = 'block';
+    }
+
+    // Закрытие модального окна
+    closeModal.onclick = function() {
+      modal.style.display = 'none';
+    };
+    window.onclick = function(event) {
+      if (event.target == modal) {
+        modal.style.display = 'none';
+      }
+    };
+
+    // Загружаем товары при старте
+    loadProducts();
+
+    // Загрузка категорий
+    async function loadCategories() {
+      try {
+        const snapshot = await db.collection('categories').get();
+        categorySelect.innerHTML = '<option value="">Выберите категорию</option>';
+        categoriesList.innerHTML = '';
+        snapshot.forEach(doc => {
+          const category = doc.data();
+          const option = document.createElement('option');
+          option.value = doc.id;
+          option.textContent = category.name;
+          categorySelect.appendChild(option);
+          const li = document.createElement('li');
+          li.textContent = category.name;
+          const deleteBtn = document.createElement('button');
+          deleteBtn.textContent = 'Удалить';
+          deleteBtn.onclick = () => deleteCategory(doc.id);
+          li.appendChild(deleteBtn);
+          categoriesList.appendChild(li);
+        });
+      } catch (error) {
+        console.error('Ошибка:', error);
+      }
+    }
+
+    // Добавление категории
+    addCategoryBtn.addEventListener('click', async () => {
+      const name = newCategoryInput.value.trim();
+      if (!name) {
+        alert('Введите название категории');
+        return;
+      }
+      try {
+        await db.collection('categories').add({ name });
+        newCategoryInput.value = '';
+        loadCategories();
+      } catch (error) {
+        console.error('Ошибка:', error);
+        alert('Произошла ошибка: ' + error.message);
+      }
+    });
+
+    // Удаление категории
+    async function deleteCategory(id) {
+      try {
+        await db.collection('categories').doc(id).delete();
+        loadCategories();
+      } catch (error) {
+        console.error('Ошибка:', error);
+        alert('Произошла ошибка: ' + error.message);
+      }
+    }
+
+    // Загружаем категории при старте
+    loadCategories();
   </script>
 </body>
 </html>
